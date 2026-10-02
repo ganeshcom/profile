@@ -153,7 +153,7 @@ const musicStatus = document.getElementById('musicStatus');
 const musicPlay = document.getElementById('musicPlay');
 const musicPlayIcon = document.getElementById('musicPlayIcon');
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-const melody = [293.66, 329.63, 392, 440, 493.88, 587.33, 493.88, 440];
+const melody = [523.25, 659.25, 783.99, 659.25, 587.33, 523.25, 392, 523.25];
 let musicContext;
 let musicMaster;
 let droneOscillators = [];
@@ -165,8 +165,8 @@ let musicRequestId = 0;
 
 function setMusicButton(playing) {
   musicPlayer.classList.toggle('is-playing', playing);
-  musicPlay.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} Tamil BGM`);
-  musicPlay.title = `${playing ? 'Pause' : 'Play'} Tamil BGM`;
+  musicPlay.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} background music`);
+  musicPlay.title = `${playing ? 'Pause' : 'Play'} background music`;
   musicPlayIcon.textContent = playing ? '❚❚' : '▶';
 }
 
@@ -197,7 +197,7 @@ function playPhrase() {
 }
 
 function startDrone() {
-  droneOscillators = [110, 164.81].map((frequency, index) => {
+  droneOscillators = [130.81, 196].map((frequency, index) => {
     const oscillator = musicContext.createOscillator();
     const volume = musicContext.createGain();
     oscillator.type = 'sine';
@@ -210,7 +210,7 @@ function startDrone() {
   });
 }
 
-async function startTamilBgm(userActivated = false) {
+async function startBackgroundMusic(userActivated = false) {
   if (musicPlaying || (musicStarting && !userActivated)) return;
   if (!AudioContextClass) {
     musicStatus.textContent = 'AUDIO IS NOT AVAILABLE IN THIS BROWSER';
@@ -234,7 +234,7 @@ async function startTamilBgm(userActivated = false) {
     musicMaster.gain.setTargetAtTime(0.2, musicContext.currentTime, 0.35);
     startDrone();
     setMusicButton(true);
-    musicStatus.textContent = 'ORIGINAL INSTRUMENTAL • PLAYING';
+    musicStatus.textContent = 'INSTRUMENTAL • PLAYING';
     playPhrase();
   } catch {
     if (requestId === musicRequestId) {
@@ -244,7 +244,7 @@ async function startTamilBgm(userActivated = false) {
   }
 }
 
-function pauseTamilBgm() {
+function pauseBackgroundMusic() {
   musicRequestId++;
   musicStarting = false;
   musicPlaying = false;
@@ -259,16 +259,16 @@ function pauseTamilBgm() {
 }
 
 musicPlay.addEventListener('click', () => {
-  if (musicPlaying) pauseTamilBgm();
-  else startTamilBgm(true);
+  if (musicPlaying) pauseBackgroundMusic();
+  else startBackgroundMusic(true);
 });
 
 document.addEventListener('pointerdown', event => {
-  if (!(event.target instanceof Element) || !event.target.closest('#musicPlay')) startTamilBgm(true);
+  if (!(event.target instanceof Element) || !event.target.closest('#musicPlay')) startBackgroundMusic(true);
 }, { once: true });
 document.addEventListener('keydown', event => {
-  if (!(event.target instanceof Element) || !event.target.closest('#musicPlay')) startTamilBgm(true);
+  if (!(event.target instanceof Element) || !event.target.closest('#musicPlay')) startBackgroundMusic(true);
 }, { once: true });
 
 musicStatus.textContent = 'TRYING AUTO-PLAY...';
-startTamilBgm();
+startBackgroundMusic();
