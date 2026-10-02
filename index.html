@@ -63,6 +63,9 @@
           <span><i></i> Currently: MBA in Business Analytics</span>
           <span><i></i> HITS • Chennai</span>
         </div>
+        <div class="hero-clock-wrap">
+          <div class="hero-clock" id="liveDate" aria-live="polite">Loading...</div>
+        </div>
         <div class="hero-actions">
           <a href="#s2" class="btn btn-primary">Explore my story <span>↓</span></a>
           <a href="#s7" class="btn btn-ghost">Visitor card ↗</a>
@@ -346,8 +349,37 @@
         <div>From school roots to analytics.</div>
         <a href="#s1">Back to top ↑</a>
       </footer>
+
+      <button id="cameraTriggerBtn" class="camera-trigger-btn camera-capture" type="button" aria-label="Open camera" title="Open camera">
+        <span class="camera-capture-icon" aria-hidden="true">📷</span>
+        <span class="camera-capture-label">CAMERA</span>
+      </button>
     </section>
   </main>
+
+  <audio id="backgroundMusic" preload="auto" playsinline aria-hidden="true" style="display:none;">
+    <source src="music/song1.mp3" type="audio/mpeg">
+  </audio>
+
+  <div id="cameraModal" class="camera-modal hidden" aria-live="polite">
+    <div class="camera-header">
+      <span>Portfolio Camera</span>
+      <button id="cameraCloseBtn" type="button" class="camera-close-btn" aria-label="Close camera">×</button>
+    </div>
+
+    <div class="camera-stage">
+      <video id="cameraVideo" autoplay playsinline muted></video>
+      <img id="cameraPreview" alt="Captured preview" hidden />
+    </div>
+
+    <div class="camera-status" id="cameraStatus">Ready</div>
+
+    <div class="camera-actions">
+      <button id="cameraTakePhotoBtn" type="button" class="camera-primary-btn">Take Photo</button>
+      <button id="cameraRetakeBtn" type="button" class="camera-secondary-btn" hidden>Retake</button>
+      <button id="cameraSaveBtn" type="button" class="camera-secondary-btn" hidden>Save to Google Drive</button>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

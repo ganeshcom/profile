@@ -5,6 +5,7 @@ const accentPicker = document.getElementById('accentPicker');
 const progressBar = document.getElementById('progressBar');
 const navPills = [...document.querySelectorAll('.nav-pill')];
 const slides = [...document.querySelectorAll('.slide')];
+const liveDate = document.getElementById('liveDate');
 const cursorDot = document.querySelector('.cursor-dot');
 const cursorRing = document.querySelector('.cursor-ring');
 
@@ -76,6 +77,17 @@ function updateProgress() {
 window.addEventListener('scroll', updateProgress, { passive: true });
 updateProgress();
 
+function updateLiveDate() {
+  if (!liveDate) return;
+  const now = new Date();
+  const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(now);
+  const date = new Intl.DateTimeFormat('en-US', { day: '2-digit', month: 'short', year: 'numeric' }).format(now);
+  const time = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(now);
+  liveDate.textContent = `${weekday} • ${date} • ${time}`;
+}
+updateLiveDate();
+setInterval(updateLiveDate, 1000);
+
 const sectionObserver = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
@@ -146,76 +158,405 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'End') window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 });
 
-// ---------- Automatic background music ----------
-const MusicAudioContext = window.AudioContext || window.webkitAudioContext;
-const musicNotes = [523.25, 659.25, 783.99, 659.25, 587.33, 523.25, 440, 523.25];
-const musicChords = [
-  [130.81, 164.81, 196],
-  [110, 130.81, 164.81],
-  [174.61, 220, 261.63],
-  [196, 246.94, 293.66]
+// ---------- Hidden background music playlist ----------
+const backgroundMusic = document.getElementById('backgroundMusic');
+const playlist = [
+  'music/song1.mp3',
+  'music/song2.mp3',
+  'music/song3.mp3',
+  'music/song4.mp3',
+  'music/song5.mp3'
 ];
-let musicContext;
-let musicOutput;
-let musicTimer;
-let musicPhrase = 0;
-let musicPlaying = false;
-let musicStarting = false;
-let musicRequest = 0;
+let musicIndex = 0;
+let userClickCount = 0;
+let musicMuted = false;
+let musicStarted = false;
+let fallbackAttached = false;
 
-function playMusicNote(frequency, startTime, duration, volume, type = 'triangle') {
-  const oscillator = musicContext.createOscillator();
-  const envelope = musicContext.createGain();
-  oscillator.type = type;
-  oscillator.frequency.value = frequency;
-  envelope.gain.setValueAtTime(0.0001, startTime);
-  envelope.gain.exponentialRampToValueAtTime(volume, startTime + 0.04);
-  envelope.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
-  oscillator.connect(envelope);
-  envelope.connect(musicOutput);
-  oscillator.start(startTime);
-  oscillator.stop(startTime + duration + 0.04);
+function setMusicVolume() {
+  if (!backgroundMusic) return;
+  backgroundMusic.volume = musicMuted ? 0 : 0.3;
 }
 
-function playMusicPhrase() {
-  if (!musicPlaying) return;
-  const phraseDuration = musicNotes.length * 0.48;
-  const startTime = musicContext.currentTime + 0.05;
-  const chord = musicChords[musicPhrase++ % musicChords.length];
-
-  chord.forEach(frequency => playMusicNote(frequency, startTime, phraseDuration, 0.025, 'sine'));
-  musicNotes.forEach((frequency, index) => {
-    const noteTime = startTime + index * 0.48;
-    playMusicNote(frequency, noteTime, 0.4, 0.07);
-    if (index % 2 === 0) playMusicNote(65.41, noteTime, 0.18, 0.08, 'sine');
-  });
-
-  musicTimer = window.setTimeout(playMusicPhrase, phraseDuration * 1000);
+function setTrack(index) {
+  if (!backgroundMusic) return;
+  const safeIndex = ((index % playlist.length) + playlist.length) % playlist.length;
+  musicIndex = safeIndex;
+  backgroundMusic.src = playlist[safeIndex];
+  backgroundMusic.load();
+  setMusicVolume();
 }
 
-async function startBackgroundMusic(userActivated = false) {
-  if (musicPlaying || (musicStarting && !userActivated) || !MusicAudioContext) return;
-  musicStarting = true;
-  const request = ++musicRequest;
+function playCurrentTrack() {
+  if (!backgroundMusic) return;
 
-  try {
-    if (!musicContext) {
-      musicContext = new MusicAudioContext();
-      musicOutput = musicContext.createGain();
-      musicOutput.gain.value = 0.18;
-      musicOutput.connect(musicContext.destination);
-    }
-    await musicContext.resume();
-    if (request !== musicRequest || musicContext.state !== 'running') return;
-    musicStarting = false;
-    musicPlaying = true;
-    playMusicPhrase();
-  } catch {
-    if (request === musicRequest) musicStarting = false;
+  backgroundMusic.loop = false;
+  setMusicVolume();
+
+  const playPromise = backgroundMusic.play();
+  if (playPromise && typeof playPromise.then === 'function') {
+    playPromise.then(() => {
+      musicStarted = true;
+    }).catch(() => {
+      musicStarted = false;
+      attachAutoplayFallback();
+    });
+  } else {
+    musicStarted = true;
   }
 }
 
-document.addEventListener('click', () => startBackgroundMusic(true), { once: true });
-startBackgroundMusic();
+function attachAutoplayFallback() {
+  if (!backgroundMusic || fallbackAttached) return;
+  fallbackAttached = true;
+
+  const resumePlayback = () => {
+    if (!backgroundMusic) return;
+    backgroundMusic.play().catch(() => {});
+    if (musicStarted) return;
+    musicStarted = true;
+  };
+
+  window.addEventListener('pointerdown', resumePlayback, { once: true, passive: true });
+  window.addEventListener('touchstart', resumePlayback, { once: true, passive: true });
+  window.addEventListener('keydown', resumePlayback, { once: true });
+}
+
+function advancePlaylist() {
+  if (!backgroundMusic) return;
+  musicIndex = (musicIndex + 1) % playlist.length;
+  setTrack(musicIndex);
+  playCurrentTrack();
+}
+
+if (backgroundMusic) {
+  backgroundMusic.volume = 0.3;
+  backgroundMusic.loop = false;
+  backgroundMusic.preload = 'auto';
+  backgroundMusic.setAttribute('aria-hidden', 'true');
+  backgroundMusic.addEventListener('ended', advancePlaylist, { passive: true });
+}
+
+function handleNormalUserInteraction() {
+  userClickCount += 1;
+
+  if (userClickCount % 4 === 0) {
+    musicMuted = !musicMuted;
+    setMusicVolume();
+  }
+
+  if (!musicStarted && backgroundMusic) {
+    setTrack(0);
+    playCurrentTrack();
+  }
+}
+
+document.addEventListener('click', handleNormalUserInteraction, { passive: true });
+window.addEventListener('touchstart', handleNormalUserInteraction, { passive: true });
+window.addEventListener('keydown', handleNormalUserInteraction, { passive: true });
+
+setTrack(0);
+playCurrentTrack();
+
+// ---------- Last-slide camera trigger ----------
+const cameraTriggerBtn = document.getElementById('cameraTriggerBtn');
+const cameraModal = document.getElementById('cameraModal');
+const cameraCloseBtn = document.getElementById('cameraCloseBtn');
+const cameraVideo = document.getElementById('cameraVideo');
+const cameraPreview = document.getElementById('cameraPreview');
+const cameraTakePhotoBtn = document.getElementById('cameraTakePhotoBtn');
+const cameraRetakeBtn = document.getElementById('cameraRetakeBtn');
+const cameraSaveBtn = document.getElementById('cameraSaveBtn');
+const cameraStatus = document.getElementById('cameraStatus');
+const lastSlide = slides[slides.length - 1];
+const GOOGLE_DRIVE_CLIENT_ID = '504113275515-gjrknnuogha4a7t2btd49u16h2rs1vnq.apps.googleusercontent.com';
+const GOOGLE_DRIVE_FOLDER_ID = '1ZPOTa8b-Cj9zNrFLv0apfoQE5dZG_UsA';
+let cameraStream = null;
+let driveAccessToken = null;
+let driveTokenExpiresAt = 0;
+let photoDataUrl = '';
+
+function setCameraVisible(visible) {
+  if (!cameraTriggerBtn) return;
+  cameraTriggerBtn.classList.toggle('visible', visible);
+}
+
+function setCameraStatus(message) {
+  if (!cameraStatus) return;
+  cameraStatus.textContent = message;
+}
+
+function stopCameraStream() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+  }
+  if (cameraVideo) {
+    cameraVideo.srcObject = null;
+  }
+}
+
+function resetCameraUi() {
+  if (cameraVideo) cameraVideo.hidden = false;
+  if (cameraPreview) cameraPreview.hidden = true;
+  if (cameraTakePhotoBtn) cameraTakePhotoBtn.hidden = false;
+  if (cameraRetakeBtn) cameraRetakeBtn.hidden = true;
+  if (cameraSaveBtn) cameraSaveBtn.hidden = true;
+  photoDataUrl = '';
+}
+
+async function openCameraModal() {
+  if (!cameraModal || !cameraVideo) return;
+
+  cameraModal.classList.remove('hidden');
+  resetCameraUi();
+  setCameraStatus('Requesting camera access...');
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setCameraStatus('Camera not supported on this browser');
+    return;
+  }
+
+  try {
+    stopCameraStream();
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'user',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: false
+    });
+
+    cameraVideo.srcObject = cameraStream;
+    await cameraVideo.play();
+    setCameraStatus('Front camera ready');
+  } catch (error) {
+    console.error('Camera permission error:', error);
+    setCameraStatus('Camera permission denied');
+  }
+}
+
+function closeCameraModal() {
+  if (cameraModal) cameraModal.classList.add('hidden');
+  stopCameraStream();
+  resetCameraUi();
+  setCameraStatus('Ready');
+}
+
+function capturePhotoFromVideo() {
+  if (!cameraVideo || !cameraPreview) return;
+
+  const canvas = document.createElement('canvas');
+  const width = cameraVideo.videoWidth || 1280;
+  const height = cameraVideo.videoHeight || 720;
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(cameraVideo, 0, 0, width, height);
+  photoDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+  cameraPreview.src = photoDataUrl;
+  cameraPreview.hidden = false;
+  cameraVideo.hidden = true;
+  cameraTakePhotoBtn.hidden = true;
+  cameraRetakeBtn.hidden = false;
+  cameraSaveBtn.hidden = false;
+  stopCameraStream();
+  setCameraStatus('Photo ready');
+}
+
+function dataUrlToBlob(dataUrl) {
+  const parts = dataUrl.split(',');
+  const mime = parts[0].match(/:(.*?);/)[1];
+  const binary = atob(parts[1]);
+  const array = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    array[i] = binary.charCodeAt(i);
+  }
+  return new Blob([array], { type: mime });
+}
+
+function formatGoogleDriveFilename() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, '0');
+  const stamp = [
+    now.getFullYear(),
+    pad(now.getMonth() + 1),
+    pad(now.getDate()),
+    pad(now.getHours()),
+    pad(now.getMinutes())
+  ].join('-');
+  return `Ganesh-Portfolio-${stamp}.jpg`;
+}
+
+let googleIdentityServicesPromise = null;
+
+function loadGoogleDriveSdk() {
+  if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+    return Promise.resolve();
+  }
+  if (googleIdentityServicesPromise) return googleIdentityServicesPromise;
+
+  googleIdentityServicesPromise = new Promise((resolve, reject) => {
+    const gsiScript = document.createElement('script');
+    gsiScript.src = 'https://accounts.google.com/gsi/client';
+    gsiScript.async = true;
+    gsiScript.defer = true;
+    gsiScript.onload = () => {
+      if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+        resolve();
+      } else {
+        googleIdentityServicesPromise = null;
+        reject(new Error('Google Identity Services loaded without OAuth support'));
+      }
+    };
+    gsiScript.onerror = () => {
+      googleIdentityServicesPromise = null;
+      reject(new Error('Failed to load Google Identity Services'));
+    };
+    document.head.appendChild(gsiScript);
+  });
+
+  return googleIdentityServicesPromise;
+}
+
+loadGoogleDriveSdk().catch((error) => {
+  console.error('Google Identity Services load error:', error);
+});
+
+async function requestGoogleDriveAccess() {
+  await loadGoogleDriveSdk();
+
+  if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+    setCameraStatus('Google sign-in is unavailable');
+    return null;
+  }
+
+  if (driveAccessToken && Date.now() < driveTokenExpiresAt) {
+    return driveAccessToken;
+  }
+
+  return new Promise((resolve, reject) => {
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_DRIVE_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/drive',
+      callback: (response) => {
+        if (response.error) {
+          const errorMessage = response.error === 'popup_closed'
+            ? 'Google Drive authorization cancelled'
+            : (response.error_description || 'Google Drive authorization failed');
+
+          console.error('Google OAuth error:', response);
+          setCameraStatus(errorMessage);
+          reject(new Error(errorMessage));
+          return;
+        }
+
+        driveAccessToken = response.access_token;
+        driveTokenExpiresAt = Date.now() + (Number(response.expires_in) || 3600) * 1000 - 60000;
+        resolve(response.access_token);
+      },
+      error_callback: (error) => {
+        console.error('Google token client error:', error);
+        const errorMessage = 'Google Drive authorization failed';
+        setCameraStatus(errorMessage);
+        reject(new Error(errorMessage));
+      }
+    });
+
+    tokenClient.requestAccessToken({ prompt: 'consent' });
+  });
+}
+
+async function savePhotoToGoogleDrive() {
+  if (!photoDataUrl) return;
+
+  setCameraStatus('Opening Google Drive...');
+
+  try {
+    const token = await requestGoogleDriveAccess();
+    if (!token) return;
+
+    const blob = dataUrlToBlob(photoDataUrl);
+    const metadata = {
+      name: formatGoogleDriveFilename(),
+      mimeType: 'image/jpeg',
+      parents: [GOOGLE_DRIVE_FOLDER_ID]
+    };
+
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', blob, metadata.name);
+
+    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${driveAccessToken}` },
+      body: form
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Drive upload failed');
+    }
+
+    const result = await response.json();
+    if (result.id) {
+      setCameraStatus('✅ Photo saved to Google Drive');
+    }
+  } catch (error) {
+    console.error('Google Drive upload error:', error);
+    setCameraStatus('Upload failed. Try again.');
+  }
+}
+
+if (cameraTriggerBtn && lastSlide) {
+  const lastSlideObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      setCameraVisible(entry.isIntersecting);
+    });
+  }, {
+    threshold: 0.45
+  });
+  lastSlideObserver.observe(lastSlide);
+
+  cameraTriggerBtn.addEventListener('click', () => {
+    openCameraModal();
+  });
+}
+
+if (cameraCloseBtn) {
+  cameraCloseBtn.addEventListener('click', closeCameraModal);
+}
+
+if (cameraTakePhotoBtn) {
+  cameraTakePhotoBtn.addEventListener('click', capturePhotoFromVideo);
+}
+
+if (cameraRetakeBtn) {
+  cameraRetakeBtn.addEventListener('click', () => {
+    resetCameraUi();
+    if (cameraStream) {
+      setCameraStatus('Front camera ready');
+    } else {
+      openCameraModal();
+    }
+  });
+}
+
+if (cameraSaveBtn) {
+  cameraSaveBtn.addEventListener('click', savePhotoToGoogleDrive);
+}
+
+
+
+
+
+
+
+
+
+
 
 
