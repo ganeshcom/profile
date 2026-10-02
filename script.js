@@ -215,8 +215,7 @@ async function startBackgroundMusic(userActivated = false) {
   }
 }
 
-document.addEventListener('pointerdown', () => startBackgroundMusic(true), { once: true });
-document.addEventListener('keydown', () => startBackgroundMusic(true), { once: true });
+document.addEventListener('click', () => startBackgroundMusic(true), { once: true });
 startBackgroundMusic();
 
 
