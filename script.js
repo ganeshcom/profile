@@ -145,3 +145,65 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Home') window.scrollTo({ top: 0, behavior: 'smooth' });
   if (e.key === 'End') window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 });
+
+// ---------- Music player ----------
+const musicPlayer = document.getElementById('musicPlayer');
+const musicAudio = document.getElementById('musicAudio');
+const musicTrack = document.getElementById('musicTrack');
+const musicStatus = document.getElementById('musicStatus');
+const musicPlay = document.getElementById('musicPlay');
+const musicPlayIcon = document.getElementById('musicPlayIcon');
+const musicNext = document.getElementById('musicNext');
+const musicTracks = [
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'
+];
+let currentMusicTrack = 0;
+
+function loadMusicTrack(shouldPlay = false) {
+  musicAudio.src = musicTracks[currentMusicTrack];
+  musicTrack.textContent = `Instrumental track ${String(currentMusicTrack + 1).padStart(2, '0')}`;
+  musicStatus.textContent = `SOUNDHELIX • TRACK ${currentMusicTrack + 1} / ${musicTracks.length}`;
+  if (shouldPlay) {
+    musicAudio.play().catch(() => {
+      musicStatus.textContent = 'Unable to play this track';
+    });
+  }
+}
+
+musicPlay.addEventListener('click', () => {
+  if (musicAudio.paused) {
+    if (!musicAudio.src) loadMusicTrack();
+    musicAudio.play().catch(() => {
+      musicStatus.textContent = 'Unable to play this track';
+    });
+  } else {
+    musicAudio.pause();
+  }
+});
+
+musicNext.addEventListener('click', () => {
+  const shouldPlay = !musicAudio.paused;
+  currentMusicTrack = (currentMusicTrack + 1) % musicTracks.length;
+  loadMusicTrack(shouldPlay);
+});
+
+musicAudio.addEventListener('play', () => {
+  musicPlayer.classList.add('is-playing');
+  musicPlay.setAttribute('aria-label', 'Pause music');
+  musicPlay.title = 'Pause music';
+  musicPlayIcon.textContent = '❚❚';
+});
+
+musicAudio.addEventListener('pause', () => {
+  musicPlayer.classList.remove('is-playing');
+  musicPlay.setAttribute('aria-label', 'Play music');
+  musicPlay.title = 'Play music';
+  musicPlayIcon.textContent = '▶';
+});
+
+musicAudio.addEventListener('ended', () => {
+  currentMusicTrack = (currentMusicTrack + 1) % musicTracks.length;
+  loadMusicTrack(true);
+});
