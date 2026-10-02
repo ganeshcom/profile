@@ -167,7 +167,7 @@ function loadMusicTrack(shouldPlay = false) {
   musicStatus.textContent = `SOUNDHELIX • TRACK ${currentMusicTrack + 1} / ${musicTracks.length}`;
   if (shouldPlay) {
     musicAudio.play().catch(() => {
-      musicStatus.textContent = 'Unable to play this track';
+      musicStatus.textContent = 'TAP PLAY TO START';
     });
   }
 }
@@ -176,7 +176,7 @@ musicPlay.addEventListener('click', () => {
   if (musicAudio.paused) {
     if (!musicAudio.src) loadMusicTrack();
     musicAudio.play().catch(() => {
-      musicStatus.textContent = 'Unable to play this track';
+      musicStatus.textContent = 'MUSIC COULD NOT START';
     });
   } else {
     musicAudio.pause();
@@ -207,3 +207,5 @@ musicAudio.addEventListener('ended', () => {
   currentMusicTrack = (currentMusicTrack + 1) % musicTracks.length;
   loadMusicTrack(true);
 });
+
+loadMusicTrack(true);
