@@ -148,64 +148,127 @@ window.addEventListener('keydown', (e) => {
 
 // ---------- Music player ----------
 const musicPlayer = document.getElementById('musicPlayer');
-const musicAudio = document.getElementById('musicAudio');
 const musicTrack = document.getElementById('musicTrack');
 const musicStatus = document.getElementById('musicStatus');
 const musicPlay = document.getElementById('musicPlay');
 const musicPlayIcon = document.getElementById('musicPlayIcon');
-const musicNext = document.getElementById('musicNext');
-const musicTracks = [
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'
-];
-let currentMusicTrack = 0;
+const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+const melody = [293.66, 329.63, 392, 440, 493.88, 587.33, 493.88, 440];
+let musicContext;
+let musicMaster;
+let droneOscillators = [];
+let phraseTimer;
+let phraseCount = 0;
+let musicPlaying = false;
+let musicStarting = false;
+let musicRequestId = 0;
 
-function loadMusicTrack(shouldPlay = false) {
-  musicAudio.src = musicTracks[currentMusicTrack];
-  musicTrack.textContent = `Instrumental track ${String(currentMusicTrack + 1).padStart(2, '0')}`;
-  musicStatus.textContent = `SOUNDHELIX • TRACK ${currentMusicTrack + 1} / ${musicTracks.length}`;
-  if (shouldPlay) {
-    musicAudio.play().catch(() => {
+function setMusicButton(playing) {
+  musicPlayer.classList.toggle('is-playing', playing);
+  musicPlay.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} Tamil BGM`);
+  musicPlay.title = `${playing ? 'Pause' : 'Play'} Tamil BGM`;
+  musicPlayIcon.textContent = playing ? '❚❚' : '▶';
+}
+
+function playTone(frequency, startTime, duration, volume, type = 'triangle') {
+  const oscillator = musicContext.createOscillator();
+  const envelope = musicContext.createGain();
+  oscillator.type = type;
+  oscillator.frequency.value = frequency;
+  envelope.gain.setValueAtTime(0.0001, startTime);
+  envelope.gain.exponentialRampToValueAtTime(volume, startTime + 0.035);
+  envelope.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  oscillator.connect(envelope);
+  envelope.connect(musicMaster);
+  oscillator.start(startTime);
+  oscillator.stop(startTime + duration + 0.03);
+}
+
+function playPhrase() {
+  if (!musicPlaying) return;
+  const phrase = phraseCount++ % 2 ? [...melody].reverse() : melody;
+  const startTime = musicContext.currentTime + 0.04;
+  phrase.forEach((frequency, index) => {
+    const noteTime = startTime + index * 0.36;
+    playTone(frequency, noteTime, 0.31, 0.075);
+    if (index % 2 === 0) playTone(98, noteTime, 0.12, 0.11, 'sine');
+  });
+  phraseTimer = window.setTimeout(playPhrase, phrase.length * 360);
+}
+
+function startDrone() {
+  droneOscillators = [110, 164.81].map((frequency, index) => {
+    const oscillator = musicContext.createOscillator();
+    const volume = musicContext.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequency;
+    volume.gain.value = index === 0 ? 0.18 : 0.1;
+    oscillator.connect(volume);
+    volume.connect(musicMaster);
+    oscillator.start();
+    return oscillator;
+  });
+}
+
+async function startTamilBgm(userActivated = false) {
+  if (musicPlaying || (musicStarting && !userActivated)) return;
+  if (!AudioContextClass) {
+    musicStatus.textContent = 'AUDIO IS NOT AVAILABLE IN THIS BROWSER';
+    return;
+  }
+
+  musicStarting = true;
+  const requestId = ++musicRequestId;
+  try {
+    if (!musicContext) {
+      musicContext = new AudioContextClass();
+      musicMaster = musicContext.createGain();
+      musicMaster.gain.value = 0.0001;
+      musicMaster.connect(musicContext.destination);
+    }
+    await musicContext.resume();
+    if (requestId !== musicRequestId) return;
+    musicPlaying = true;
+    musicStarting = false;
+    musicMaster.gain.cancelScheduledValues(musicContext.currentTime);
+    musicMaster.gain.setTargetAtTime(0.2, musicContext.currentTime, 0.35);
+    startDrone();
+    setMusicButton(true);
+    musicStatus.textContent = 'ORIGINAL INSTRUMENTAL • PLAYING';
+    playPhrase();
+  } catch {
+    if (requestId === musicRequestId) {
+      musicStarting = false;
       musicStatus.textContent = 'TAP PLAY TO START';
-    });
+    }
   }
 }
 
-musicPlay.addEventListener('click', () => {
-  if (musicAudio.paused) {
-    if (!musicAudio.src) loadMusicTrack();
-    musicAudio.play().catch(() => {
-      musicStatus.textContent = 'MUSIC COULD NOT START';
-    });
-  } else {
-    musicAudio.pause();
+function pauseTamilBgm() {
+  musicRequestId++;
+  musicStarting = false;
+  musicPlaying = false;
+  window.clearTimeout(phraseTimer);
+  if (musicContext && musicMaster) {
+    musicMaster.gain.setTargetAtTime(0.0001, musicContext.currentTime, 0.08);
+    droneOscillators.forEach(oscillator => oscillator.stop(musicContext.currentTime + 0.3));
+    droneOscillators = [];
   }
+  setMusicButton(false);
+  musicStatus.textContent = 'PAUSED';
+}
+
+musicPlay.addEventListener('click', () => {
+  if (musicPlaying) pauseTamilBgm();
+  else startTamilBgm(true);
 });
 
-musicNext.addEventListener('click', () => {
-  const shouldPlay = !musicAudio.paused;
-  currentMusicTrack = (currentMusicTrack + 1) % musicTracks.length;
-  loadMusicTrack(shouldPlay);
-});
+document.addEventListener('pointerdown', event => {
+  if (!(event.target instanceof Element) || !event.target.closest('#musicPlay')) startTamilBgm(true);
+}, { once: true });
+document.addEventListener('keydown', event => {
+  if (!(event.target instanceof Element) || !event.target.closest('#musicPlay')) startTamilBgm(true);
+}, { once: true });
 
-musicAudio.addEventListener('play', () => {
-  musicPlayer.classList.add('is-playing');
-  musicPlay.setAttribute('aria-label', 'Pause music');
-  musicPlay.title = 'Pause music';
-  musicPlayIcon.textContent = '❚❚';
-});
-
-musicAudio.addEventListener('pause', () => {
-  musicPlayer.classList.remove('is-playing');
-  musicPlay.setAttribute('aria-label', 'Play music');
-  musicPlay.title = 'Play music';
-  musicPlayIcon.textContent = '▶';
-});
-
-musicAudio.addEventListener('ended', () => {
-  currentMusicTrack = (currentMusicTrack + 1) % musicTracks.length;
-  loadMusicTrack(true);
-});
-
-loadMusicTrack(true);
+musicStatus.textContent = 'TRYING AUTO-PLAY...';
+startTamilBgm();
